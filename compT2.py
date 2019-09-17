@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy.linalg as la
 from scipy.io import loadmat
+import time
 
 def get_slice(filename):
     'Reads from dicom file basic information and returns image as array + aquisition time'
@@ -70,7 +71,7 @@ def fit_t2(t2imgs, t2times, segmentation = None):
     OUT:
         matrix (nr_slices, width, heigth) with T2 values
     '''
-    t2_tensor = []
+    t2_tensor = np.zeros((t2imgs.shape[0], t2imgs.shape[2], t2imgs.shape[3]))
     for slice_idx in range(t2imgs.shape[0]):
         scan = t2imgs[slice_idx,:,:,:]
         mri_time = np.array(t2times[slice_idx]) - t2times[slice_idx][0]
@@ -82,9 +83,7 @@ def fit_t2(t2imgs, t2times, segmentation = None):
         res_matrix = np.zeros((data.shape[1], data.shape[2]))
         for ix in range(data.shape[2]):
             for iy in range(data.shape[2]):
-                if all(data[:,ix,iy] == data[0,ix,iy]): # if constant value, decay 0 
-                    t2_matrix[ix, iy] = 0
-                    res_matrix[ix, iy] = 0
+                if all(data[:,ix,iy] == data[0,ix,iy]): # if constant value, decay is 0 
                     continue
                 beta, res, _, _ = la.lstsq(x[1:], data[1:,ix,iy])
                 t2_ = 1./beta[1]
@@ -97,11 +96,12 @@ def fit_t2(t2imgs, t2times, segmentation = None):
         t2_matrix[np.where(res_matrix > 0.1)] = 0
         if segmentation:
             t2_matrix[np.where(segmentation_mask != 1)] = 0
-        t2_tensor.append(t2_matrix) 
-    t2_tensor = np.array(t2_tensor* 1000) # in ms
+        t2_tensor[slice_idx,:,:] = t2_matrix * 1000 # in ms
     return t2_tensor
 
 if __name__ == "__main__":
     dirname = "data/9003126/T2/"
     t2imgs, t2times = get_t2(dirname)
+    t0 = time.time()
     t2matrix = fit_t2(t2imgs, t2times)
+    print(time.time() - t0)
