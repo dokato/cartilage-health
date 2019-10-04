@@ -1,10 +1,18 @@
 import os
+import sys
 import pydicom
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.linalg as la
 from scipy.io import loadmat
 import time
+
+def estimate_nr_slices(dirname, time_steps = 7):
+    '''
+    Estimates number of slices based on nr of directories in *dirname*,
+    assuming that there was *time_steps* echos measured.
+    '''
+    return int(len([name for name in os.listdir(dirname) if not name.startswith('.')])/time_steps)
 
 def get_slice(filename):
     'Reads from dicom file basic information and returns image as array + aquisition time'
@@ -100,8 +108,12 @@ def fit_t2(t2imgs, t2times, segmentation = None):
     return t2_tensor
 
 if __name__ == "__main__":
-    dirname = "data/9003126/T2/"
-    t2imgs, t2times = get_t2(dirname)
+    file_name = sys.argv[1]
+    dirname = "data/{}/T2/".format(file_name)
+    nr_slices = estimate_nr_slices(dirname)
+    t2imgs, t2times = get_t2(dirname, nr_slices = nr_slices)
     t0 = time.time()
     t2matrix = fit_t2(t2imgs, t2times)
     print(time.time() - t0)
+    with open('{}_t2'.format(file_name), 'wb') as ff:
+        np.save(ff, t2matrix)
