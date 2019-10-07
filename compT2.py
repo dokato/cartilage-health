@@ -7,6 +7,9 @@ import scipy.linalg as la
 from scipy.io import loadmat
 import time
 
+from joblib import Parallel, delayed 
+
+
 def estimate_nr_slices(dirname, time_steps = 7):
     '''
     Estimates number of slices based on nr of directories in *dirname*,
@@ -52,24 +55,26 @@ def get_t2(path, nr_slices = 29, time_steps = 7):
     slices = np.float32(slices) #uint8
     return slices, time_slices
 
-def get_segmentation_mask(path, nr_slices = 29):
+def get_segmentation_mask(path, nr_slices = 29, structure = 'femoral_cartilage'):
     '''
     Returns binary mask of the region of interest.
     IN:
         path - string with formatting indication number of slice, eg.
                "data/9003126/T2BinarySegmentation/9003126_4_{}.mat"
-        nr_slices - integer 
+        nr_slices - integer with number of slices (can be estimated based on data;
+                look at *estimate_nr_slices* function)
+        structure - string with name of tissue (default 'femoral_cartilage')
     OUT:
         segmentation matrix (nr_slices, width, heigth)
     '''
     segmentation = []
     for i in range(nr_slices):
         mat = loadmat(path.format(i))
-        segmentation.append(mat['femoral_cartilage'])
+        segmentation.append(mat[structure])
     segmentation = np.array(segmentation)
     return segmentation
 
-def fit_t2(t2imgs, t2times, segmentation = None):
+def fit_t2(t2imgs, t2times, segmentation = None, n_jobs = 4):
     '''
     Fits T2 curves to the T2_weighted images in each slice.
     IN:
@@ -80,7 +85,8 @@ def fit_t2(t2imgs, t2times, segmentation = None):
         matrix (nr_slices, width, heigth) with T2 values
     '''
     t2_tensor = np.zeros((t2imgs.shape[0], t2imgs.shape[2], t2imgs.shape[3]))
-    for slice_idx in range(t2imgs.shape[0]):
+
+    def fit_per_slice(slice_idx):
         scan = t2imgs[slice_idx,:,:,:]
         mri_time = np.array(t2times[slice_idx]) - t2times[slice_idx][0]
         if segmentation:
@@ -104,10 +110,16 @@ def fit_t2(t2imgs, t2times, segmentation = None):
         t2_matrix[np.where(res_matrix > 0.1)] = 0
         if segmentation:
             t2_matrix[np.where(segmentation_mask != 1)] = 0
-        t2_tensor[slice_idx,:,:] = t2_matrix * 1000 # in ms
+        return t2_matrix
+
+    t2_list = Parallel(n_jobs = n_jobs, verbose=1)(map(delayed(fit_per_slice), range(t2imgs.shape[0])))
+    for i in range(t2imgs.shape[0]):
+        t2_tensor[i,:,:] = t2_list[i] * 1000 # in ms
     return t2_tensor
 
 if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        raise IOError("Expected name of the data folder")
     file_name = sys.argv[1]
     dirname = "data/{}/T2/".format(file_name)
     nr_slices = estimate_nr_slices(dirname)
@@ -115,5 +127,5 @@ if __name__ == "__main__":
     t0 = time.time()
     t2matrix = fit_t2(t2imgs, t2times)
     print(time.time() - t0)
-    with open('{}_t2'.format(file_name), 'wb') as ff:
+    with open('{}_t2.npy'.format(file_name), 'wb') as ff:
         np.save(ff, t2matrix)
