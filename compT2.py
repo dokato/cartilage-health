@@ -81,6 +81,7 @@ def fit_t2(t2imgs, t2times, segmentation = None, n_jobs = 4):
         t2imgs - with T2 weighted images in numpy array (nr_slices, time_steps, width, heigth)
         t2times - list with aquisition times
         segmentation - segmentation matrix (nr_slices, width, heigth)
+        n_jobs - number of parallel jobs
     OUT:
         matrix (nr_slices, width, heigth) with T2 values
     '''
@@ -89,7 +90,7 @@ def fit_t2(t2imgs, t2times, segmentation = None, n_jobs = 4):
     def fit_per_slice(slice_idx):
         scan = t2imgs[slice_idx,:,:,:]
         mri_time = np.array(t2times[slice_idx]) - t2times[slice_idx][0]
-        if segmentation:
+        if not segmentation is None:
             segmentation_mask = segmentation[slice_idx,:,:]
         data = np.log(scan + 0.0000000001) # to avoid log(0)
         x = np.concatenate((np.ones_like(mri_time[..., np.newaxis]), -mri_time[..., np.newaxis]), 1)
@@ -108,7 +109,7 @@ def fit_t2(t2imgs, t2times, segmentation = None, n_jobs = 4):
         t2_matrix[np.where(t2_matrix > np.percentile(t2_matrix.flatten(), 97.))] = 0
         t2_matrix[np.where(t2_matrix < 0)] = 0
         t2_matrix[np.where(res_matrix > 0.1)] = 0
-        if segmentation:
+        if not segmentation is None:
             t2_matrix[np.where(segmentation_mask != 1)] = 0
         return t2_matrix
 
@@ -123,9 +124,10 @@ if __name__ == "__main__":
     file_name = sys.argv[1]
     dirname = "data/{}/T2/".format(file_name)
     nr_slices = estimate_nr_slices(dirname)
+    segmentation = get_segmentation_mask("data/{}/T2BinarySegmentation/{}_4_".format(file_name, file_name) + "{}.mat", nr_slices)
     t2imgs, t2times = get_t2(dirname, nr_slices = nr_slices)
     t0 = time.time()
-    t2matrix = fit_t2(t2imgs, t2times)
+    t2matrix = fit_t2(t2imgs, t2times, segmentation=segmentation)
     print(time.time() - t0)
     with open('{}_t2.npy'.format(file_name), 'wb') as ff:
         np.save(ff, t2matrix)
