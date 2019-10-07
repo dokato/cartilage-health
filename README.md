@@ -58,3 +58,5 @@ data/
    ....
 compT2.py
 ```
+
+It will save results of T2 computations as `.npy` matrix file.
