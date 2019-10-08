@@ -40,7 +40,7 @@ def get_t2(path, nr_slices = 29, time_steps = 7):
         temp_slice = []
         time_slice = []
         for i in range(time_steps): # iterates over all time steps
-            file_path = dirname + '%03d' % (i * nr_slices + slice_idx)
+            file_path = path + '%03d' % (i * nr_slices + slice_idx)
             image, aq_time = get_slice(file_path)
             temp_slice.append(image)
             time_slice.append(aq_time)
@@ -124,10 +124,10 @@ if __name__ == "__main__":
     file_name = sys.argv[1]
     dirname = "data/{}/T2/".format(file_name)
     nr_slices = estimate_nr_slices(dirname)
-    segmentation = get_segmentation_mask("data/{}/T2BinarySegmentation/{}_4_".format(file_name, file_name) + "{}.mat", nr_slices)
+    segmentation = None #get_segmentation_mask("data/{}/T2BinarySegmentation/{}_4_".format(file_name, file_name) + "{}.mat", nr_slices)
     t2imgs, t2times = get_t2(dirname, nr_slices = nr_slices)
     t0 = time.time()
-    t2matrix = fit_t2(t2imgs, t2times, segmentation=segmentation)
+    t2matrix = fit_t2(t2imgs, t2times, segmentation = segmentation)
     print(time.time() - t0)
     with open('{}_t2.npy'.format(file_name), 'wb') as ff:
         np.save(ff, t2matrix)
