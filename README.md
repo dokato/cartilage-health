@@ -60,3 +60,11 @@ compT2.py
 ```
 
 It will save results of T2 computations as `.npy` matrix file.
+
+## Command line
+
+Alternatively, you may call this command line tool. For more details on how to use it, check the manual:
+
+```
+python compT2-cli.py -h
+```
