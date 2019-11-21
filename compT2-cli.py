@@ -3,7 +3,7 @@ from compT2 import *
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument("id", help="Subject ID (should be a nome of folder from *data_folder*)")
+parser.add_argument("id", help="Subject ID (should be a name of a folder from *data_folder*)")
 parser.add_argument("-d", "--data_folder", type=str, default = "data/",
                     help="Folder with T2-weighted echo measurments (default: 'data/')")
 parser.add_argument("-n", "--nr_slices", type=int, default = None,
