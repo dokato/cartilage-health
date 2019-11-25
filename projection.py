@@ -31,14 +31,16 @@ def leastsq_circle(x,y):
     return xc, yc, R, residu
 
 def cart2pol(x, y):
+    'cartesian coordinates to polar (rho, phi)'
     rho = np.sqrt(x**2 + y**2)
     phi = np.arctan2(y, x)
-    return(rho, phi)
+    return rho, phi
 
 def pol2cart(rho, phi):
+    'polar coordinates to cartesian (x, y)'
     x = rho * np.cos(phi)
     y = rho * np.sin(phi)
-    return(x, y)
+    return x, y
 
 def get_region_value(regiondict, binned_super, binned_deep, angle, slice):
     """
@@ -108,7 +110,7 @@ def projection(masked_cartilage, thickness_div = 0.5, values_threshold = 100,
     deep_visualization  = np.zeros((nr_slices,72))
     superficial_values  = []
     deep_values         = []
-    regions = ['SLA','SLC','SLP','SUA','SUC','SUP','DLA','DLC','DLP','DUA','DUC', 'DUP']
+    regions = ['SLA', 'SLC', 'SLP', 'SUA', 'SUC', 'SUP', 'DLA', 'DLC', 'DLP', 'DUA', 'DUC', 'DUP']
     regiondict = dict((i, []) for i in regions)
 
     for i in range(nr_slices):
