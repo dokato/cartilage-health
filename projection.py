@@ -88,7 +88,7 @@ def projection(masked_cartilage, thickness_div = 0.5, values_threshold = 100,
     nr_slices = masked.shape[0]
 
     masked[masked > values_threshold] = 0
-    mask_proj = np.max(masked, axis = 0)
+    mask_proj = masked.max(0)
 
     x_coord, y_coord = np.nonzero(mask_proj)
     xc, yc, R, _ = leastsq_circle(x_coord, y_coord)
@@ -112,6 +112,8 @@ def projection(masked_cartilage, thickness_div = 0.5, values_threshold = 100,
     deep_values         = []
     regions = ['SLA', 'SLC', 'SLP', 'SUA', 'SUC', 'SUP', 'DLA', 'DLC', 'DLP', 'DUA', 'DUC', 'DUP']
     regiondict = dict((i, []) for i in regions)
+
+    mask_proj1 = masked.max(1)
 
     for i in range(nr_slices):
         if np.all(masked[i, :, :]==0):
@@ -163,20 +165,20 @@ def projection(masked_cartilage, thickness_div = 0.5, values_threshold = 100,
 
     if fig:
         plt.subplot(2,2,1)
-        im1 = Image.fromarray(visualization)                                    
-        im2 = im1.resize((512,512))                                           
+        im1 = Image.fromarray(visualization)
+        im2 = im1.resize((512,512))
         plt.imshow(im2)
         plt.colorbar()
         plt.title('All')
         plt.subplot(2,2,2)
-        im1 = Image.fromarray(super_visualization)                                    
-        im2 = im1.resize((512,512))                                           
+        im1 = Image.fromarray(super_visualization)
+        im2 = im1.resize((512,512))
         plt.imshow(im2)
         plt.colorbar()
         plt.title('superficial')
         plt.subplot(2,2,3)
-        im1 = Image.fromarray(deep_visualization)                                    
-        im2 = im1.resize((512,512))                                           
+        im1 = Image.fromarray(deep_visualization)
+        im2 = im1.resize((512,512))
         plt.imshow(im2)
         plt.colorbar()
         plt.title('deep')
