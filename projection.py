@@ -184,7 +184,7 @@ def projection(masked_cartilage, thickness_div = 0.5, values_threshold = 100,
         plt.title('deep')
         plt.show()
 
-    return avg_vals_dict
+    return visualization, super_visualization, deep_visualization, avg_vals_dict
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
@@ -193,7 +193,12 @@ if __name__ == "__main__":
     if file_name == 'x':
         file_name = '9003126_t2.npy'
     masked = np.load(file_name)
-    avg_vals_dict = projection(masked)
+    visualization, super_visualization, deep_visualization, avg_vals_dict = projection(masked)
     save_file_name = file_name.split('.')[0] + '_avg_vals.json'
+    save_viz_name = file_name.split('.')[0] + '_viz.npz'
     with open(save_file_name, "w") as f:
         f.write(json.dumps(avg_vals_dict))
+    np.savez_compressed(save_viz_name,
+                        visualization=visualization,
+                        super_visualization=super_visualization,
+                        deep_visualization=deep_visualization)
