@@ -12,7 +12,7 @@ def match_viz_shapes(t4viz, t8viz):
     if t4viz.shape[0] == t8viz.shape[0]:
         return t8viz
 
-    assert t4viz.shape[0] - t8viz.shape[0] == 1, 'sth wrong in difference' + t4viz.shape[0] + ' ' t8viz.shape[0]
+    assert t4viz.shape[0] - t8viz.shape[0] == 1, 'sth wrong in difference: ' + str(t4viz.shape[0]) + ' ' + str(t8viz.shape[0])
 
     t8viz_up = np.r_[zerosvec, t8viz]
     t8viz_down = np.r_[zerosvec, t8viz]
@@ -50,10 +50,13 @@ for ff in os.listdir('data/t4'):
         plt.imshow(t8viz>0)
         plt.savefig('nonmatching_' + vizname+'.png')
         plt.close()
-        newt8viz = match_viz_shapes(t4viz, t8viz)
+        if t4viz.shape[0] < t8viz.shape[0]:
+            t4viz = match_viz_shapes(t8viz, t4viz)
+        else:
+            t8viz = match_viz_shapes(t4viz, t8viz)
         plt.figure()
         plt.imshow(t4viz>0)
-        plt.imshow(newt8viz>0,alpha = 0.5) 
+        plt.imshow(t8viz>0,alpha = 0.5) 
         plt.savefig('newmatching_' + vizname+'.png')
         plt.close()
 
