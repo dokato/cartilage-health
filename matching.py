@@ -1,26 +1,35 @@
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy import ndimage
 
-def match_viz_shapes(t4viz, t8viz):
-    cols = t4viz.shape[1]
+def match_shapes(mat_a, mat_b):
+    """
+    For two matrices where *mat_a* has more rows (first dim) it padds the
+    *mat_b* with vectors of zero above and below.
+    """
+    assert mat_a.shape[0] >= mat_b.shape[0], "first matrix should be bigger"
+    cols = mat_a.shape[1]
     zerosvec = np.zeros((1,cols))
-
-    while t4viz.shape[0] - t8viz.shape[0] > 1:
-        t8viz = np.r_[zerosvec, t8viz, zerosvec]
-
-    if t4viz.shape[0] == t8viz.shape[0]:
-        return t8viz
-
-    assert t4viz.shape[0] - t8viz.shape[0] == 1, 'sth wrong in difference: ' + str(t4viz.shape[0]) + ' ' + str(t8viz.shape[0])
-
-    t8viz_up = np.r_[zerosvec, t8viz]
-    t8viz_down = np.r_[zerosvec, t8viz]
-
-    if np.sum((t4viz>0)*(t8viz_up>0)) > np.sum((t4viz>0)*(t8viz_down>0)):
-        return t8viz_up
+    while mat_a.shape[0] - mat_b.shape[0] > 1:
+        mat_b = np.r_[zerosvec, mat_b, zerosvec]
+    if mat_a.shape[0] == mat_b.shape[0]:
+        return mat_b
+    assert mat_a.shape[0] - mat_b.shape[0] == 1, \
+        'sth wrong in difference a:{} b:{}'.format(mat_a.shape[0], mat_b.shape[0])
+    mat_b_up = np.r_[zerosvec, mat_b]
+    mat_b_down = np.r_[zerosvec, mat_b]
+    if np.sum((mat_a>0)*(mat_b_up>0)) > np.sum((mat_a>0)*(mat_b_down>0)):
+        return mat_b_up
     else:
-        return t8viz_down
+        return mat_b_down
+
+def detect_separate(mata, matb):
+    assert mata.shape == matb.shape, "Matrices must be of the same shape"
+    sepmat = np.zeros(mata.shape)
+    sepmat[np.where((1*(mata>0)+1*(matb>0))==1)] = 1
+    return sepmat
+
 
 cnt = 0
 for ff in os.listdir('data/t4'):
@@ -51,16 +60,30 @@ for ff in os.listdir('data/t4'):
         plt.savefig('nonmatching_' + vizname+'.png')
         plt.close()
         if t4viz.shape[0] < t8viz.shape[0]:
-            t4viz = match_viz_shapes(t8viz, t4viz)
+            t4viz = match_shapes(t8viz, t4viz)
         else:
-            t8viz = match_viz_shapes(t4viz, t8viz)
-        plt.figure()
-        plt.imshow(t4viz>0)
-        plt.imshow(t8viz>0,alpha = 0.5) 
-        plt.savefig('newmatching_' + vizname+'.png')
+            t8viz = match_shapes(t4viz, t8viz)
+        plt.figure(figsize=(13,2.5))
+        plt.subplot(141)
+        plt.imshow(1*(t4viz>0)+1*(t8viz>0))
+        plt.subplot(142)
+        be = ndimage.morphology.binary_erosion((1*(t4viz>0)+1*(t8viz>0))>0,
+                                        structure=np.ones((3,3))).astype(np.int)
+        plt.imshow(be)
+        plt.subplot(143)
+        viz = t4viz-t8viz
+        rg_ = np.max([abs(np.max(viz)), abs(np.min(viz))])
+        plt.imshow(viz, cmap='RdBu', vmin=-rg_, vmax=rg_)
+        plt.colorbar()
+        plt.subplot(144)
+        viz = (t4viz-t8viz)*be
+        rg_ = np.max([abs(np.max(viz)), abs(np.min(viz))])
+        plt.imshow(viz, cmap='RdBu', vmin=-rg_, vmax=rg_)
+        plt.colorbar()
+        plt.tight_layout()
+        plt.savefig('erosion_' + vizname+'.png')
         plt.close()
 
-
-
 print('Non matching sizes:' + str(cnt))
+
 
