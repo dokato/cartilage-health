@@ -42,14 +42,16 @@ for ff in os.listdir('data/t4'):
         continue
     vizname = ff.split('.')[0]
     t4viz = t4data['visualization'] 
-    t8viz = t8data['visualization'] 
+    t8viz = t8data['visualization']
     if t4viz.shape == t8viz.shape:
+        title = 'Matched'
         plt.figure()
-        plt.imshow(t4viz>0)
-        plt.imshow(t8viz>0,alpha = 0.5) 
+        plt.imshow(-1*(t4viz>0),vmin=-1,vmax=1, cmap='seismic')
+        plt.imshow(1*(t8viz>0),alpha=0.5,vmin=-1,vmax=1, cmap='seismic')
         plt.savefig('matching_' + vizname+'.png')
         plt.close()
     else:
+        title = 'No matched'
         print('Different sizes: ' + ff + ' t4: ' + str(t4viz.shape) + ' t8: ' + str(t8viz.shape))
         cnt += 1
         plt.figure(figsize=(9,4))
@@ -63,26 +65,28 @@ for ff in os.listdir('data/t4'):
             t4viz = match_shapes(t8viz, t4viz)
         else:
             t8viz = match_shapes(t4viz, t8viz)
-        plt.figure(figsize=(13,2.5))
-        plt.subplot(141)
-        plt.imshow(1*(t4viz>0)+1*(t8viz>0))
-        plt.subplot(142)
-        be = ndimage.morphology.binary_erosion((1*(t4viz>0)+1*(t8viz>0))>0,
-                                        structure=np.ones((3,3))).astype(np.int)
-        plt.imshow(be)
-        plt.subplot(143)
-        viz = t4viz-t8viz
-        rg_ = np.max([abs(np.max(viz)), abs(np.min(viz))])
-        plt.imshow(viz, cmap='RdBu', vmin=-rg_, vmax=rg_)
-        plt.colorbar()
-        plt.subplot(144)
-        viz = (t4viz-t8viz)*be
-        rg_ = np.max([abs(np.max(viz)), abs(np.min(viz))])
-        plt.imshow(viz, cmap='RdBu', vmin=-rg_, vmax=rg_)
-        plt.colorbar()
-        plt.tight_layout()
-        plt.savefig('erosion_' + vizname+'.png')
-        plt.close()
+    plt.figure(figsize=(13,2.5))
+    plt.subplot(141)
+    plt.imshow(-1*(t4viz>0),vmin=-1,vmax=1, cmap='seismic')
+    plt.imshow(1*(t8viz>0),alpha=0.5,vmin=-1,vmax=1, cmap='seismic')
+    plt.subplot(142)
+    be = ndimage.morphology.binary_erosion((1*(t4viz>0)+1*(t8viz>0))>0,
+                                    structure=np.ones((3,3))).astype(np.int)
+    plt.imshow(be, vmin=-1,vmax=1, cmap='seismic')
+    plt.subplot(143)
+    viz = t4viz-t8viz
+    rg_ = np.max([abs(np.max(viz)), abs(np.min(viz))])
+    plt.imshow(viz, cmap='RdBu', vmin=-rg_, vmax=rg_)
+    plt.colorbar()
+    plt.subplot(144)
+    viz = (t4viz-t8viz)*be
+    rg_ = np.max([abs(np.max(viz)), abs(np.min(viz))])
+    plt.imshow(viz, cmap='RdBu', vmin=-rg_, vmax=rg_)
+    plt.colorbar()
+    plt.suptitle(title)
+    plt.tight_layout()
+    plt.savefig('erosion_' + vizname+'.png')
+    plt.close()
 
 print('Non matching sizes:' + str(cnt))
 
