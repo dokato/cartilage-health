@@ -24,12 +24,12 @@ def match_shapes(mat_a, mat_b):
     else:
         return mat_b_down
 
-def detect_separate(mata, matb):
-    assert mata.shape == matb.shape, "Matrices must be of the same shape"
-    sepmat = np.zeros(mata.shape)
-    sepmat[np.where((1*(mata>0)+1*(matb>0))==1)] = 1
-    return sepmat
-
+def remove_empty_rows(image):
+    "Removes empty rows from image (2d numpy.array)"
+    mask = image == 0
+    rows = np.flatnonzero((~mask).sum(axis=1))
+    cropped = image[rows.min():rows.max()+1, :]
+    return cropped
 
 cnt = 0
 for ff in os.listdir('data/t4'):
@@ -41,8 +41,8 @@ for ff in os.listdir('data/t4'):
         print('Not such file: ' + ff)
         continue
     vizname = ff.split('.')[0]
-    t4viz = t4data['visualization'] 
-    t8viz = t8data['visualization']
+    t4viz = remove_empty_rows(t4data['visualization'])
+    t8viz = remove_empty_rows(t8data['visualization'])
     if t4viz.shape == t8viz.shape:
         title = 'Matched'
         plt.figure()
@@ -79,15 +79,15 @@ for ff in os.listdir('data/t4'):
     plt.imshow(viz, cmap='RdBu', vmin=-rg_, vmax=rg_)
     plt.colorbar()
     plt.subplot(144)
-    viz = (t4viz-t8viz)*be
-    rg_ = np.max([abs(np.max(viz)), abs(np.min(viz))])
-    plt.imshow(viz, cmap='RdBu', vmin=-rg_, vmax=rg_)
+    diff_masked = (t4viz-t8viz)*be
+    rg_ = np.max([abs(np.max(diff_masked)), abs(np.min(diff_masked))])
+    plt.imshow(diff_masked, cmap='RdBu', vmin=-rg_, vmax=rg_)
     plt.colorbar()
     plt.suptitle(title)
     plt.tight_layout()
     plt.savefig('erosion_' + vizname+'.png')
     plt.close()
+    subj_ind = vizname.split('_')[0]
+    np.savez(os.path.join('diff', '{}_diff'.format(subj_ind)), diff = diff_masked, mask=be)
 
 print('Non matching sizes:' + str(cnt))
-
-
