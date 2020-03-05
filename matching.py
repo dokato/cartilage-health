@@ -31,6 +31,21 @@ def remove_empty_rows(image):
     cropped = image[rows.min():rows.max()+1, :]
     return cropped
 
+def eroded_and_mask(mata, matb, kernel = np.ones((2,2))):
+    """
+    Creatives mask for matrices *mata* and *matb* ( each 2D numpy.array)
+    with positive elements.
+    Erosion is applied first to each of matrix with *kernel* default(2x2)
+    Then pointwise logical and is taken between these two masks.
+    """
+    assert mata.shape == matb.shape, "Shapes don't match"
+    assert (mata>=0).all() and (matb>=0).all(), "Works only for positive matrices"
+    ermask_a = ndimage.morphology.binary_erosion(1*(mata > 0),
+                                    structure = kernel).astype(np.int)
+    ermask_b = ndimage.morphology.binary_erosion(1*(matb > 0),
+                                    structure = kernel).astype(np.int)
+    return ermask_a*ermask_b
+
 cnt = 0
 for ff in os.listdir('data/t4'):
     try:
@@ -43,6 +58,12 @@ for ff in os.listdir('data/t4'):
     vizname = ff.split('.')[0]
     t4viz = remove_empty_rows(t4data['visualization'])
     t8viz = remove_empty_rows(t8data['visualization'])
+    # in super and deep there's some empty slices, this handles it
+    # but TODO: maybe account for it in projection?
+    for i in np.argwhere(np.isnan(t4viz)): 
+        t4viz[tuple(i)]=0
+    for i in np.argwhere(np.isnan(t8viz)):
+        t8viz[tuple(i)]=0
     if t4viz.shape == t8viz.shape:
         title = 'Matched'
         plt.figure()
@@ -70,8 +91,7 @@ for ff in os.listdir('data/t4'):
     plt.imshow(-1*(t4viz>0),vmin=-1,vmax=1, cmap='seismic')
     plt.imshow(1*(t8viz>0),alpha=0.5,vmin=-1,vmax=1, cmap='seismic')
     plt.subplot(142)
-    be = ndimage.morphology.binary_erosion((1*(t4viz>0)+1*(t8viz>0))>0,
-                                    structure=np.ones((3,3))).astype(np.int)
+    be = eroded_and_mask(t4viz, t8viz)
     plt.imshow(be, vmin=-1,vmax=1, cmap='seismic')
     plt.subplot(143)
     viz = t4viz-t8viz
