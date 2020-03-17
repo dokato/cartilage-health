@@ -46,68 +46,78 @@ def eroded_and_mask(mata, matb, kernel = np.ones((2,2))):
                                     structure = kernel).astype(np.int)
     return ermask_a*ermask_b
 
-cnt = 0
-for ff in os.listdir('data/t4'):
-    try:
-        t4data = np.load(os.path.join('data/t4', ff))
-        t8data = np.load(os.path.join('data/t8', ff))
-    except FileNotFoundError as e:
-        print(e)
-        print('Not such file: ' + ff)
-        continue
-    vizname = ff.split('.')[0]
-    t4viz = remove_empty_rows(t4data['visualization'])
-    t8viz = remove_empty_rows(t8data['visualization'])
+def make_difference(t1_data, t2_data, save = None, plot = False):
+    '''
+    This fitting femoral cartilage to a cylinder, then binning every *angular_bin*
+    degrees all pixels.
+
+    IN:
+        t1_data - matrix with encoded averaged values of cartilage T2 map (from projection)
+                  time point 1
+        t2_data - matrix with encoded averaged values of cartilage T2 map (from projection)
+                  time point 2
+        save    - if string, then it saves matrix to file from the path *save*, otherwise
+                  it returns diffmat (default: None). Saved NPZ file will have two fields:
+                  *diff* with difference between *t1_data* and *t2_data* and *mask* with 
+                  a binary mask.
+        plot    - flag for plotting - default False.
+                  (if save is str is saves plot as PNG to *save* path, otherwise it shows)
+    OUT:
+        diffmat  - matrix with difference between t1_data and t2_data after matching
+                   shape of matrices
+    '''
+    t1_proj = remove_empty_rows(t1_data)
+    t2_proj = remove_empty_rows(t2_data)
     # in super and deep there's some empty slices, this handles it
     # but TODO: maybe account for it in projection?
-    for i in np.argwhere(np.isnan(t4viz)): 
-        t4viz[tuple(i)]=0
-    for i in np.argwhere(np.isnan(t8viz)):
-        t8viz[tuple(i)]=0
-    if t4viz.shape == t8viz.shape:
-        title = 'Matched'
-        plt.figure()
-        plt.imshow(-1*(t4viz>0),vmin=-1,vmax=1, cmap='seismic')
-        plt.imshow(1*(t8viz>0),alpha=0.5,vmin=-1,vmax=1, cmap='seismic')
-        plt.savefig('matching_' + vizname+'.png')
-        plt.close()
-    else:
-        title = 'No matched'
-        print('Different sizes: ' + ff + ' t4: ' + str(t4viz.shape) + ' t8: ' + str(t8viz.shape))
-        cnt += 1
-        plt.figure(figsize=(9,4))
-        plt.subplot(121)
-        plt.imshow(t4viz>0)
-        plt.subplot(122)
-        plt.imshow(t8viz>0)
-        plt.savefig('nonmatching_' + vizname+'.png')
-        plt.close()
-        if t4viz.shape[0] < t8viz.shape[0]:
-            t4viz = match_shapes(t8viz, t4viz)
+    for i in np.argwhere(np.isnan(t1_proj)): 
+        t1_proj[tuple(i)]=0
+    for i in np.argwhere(np.isnan(t2_proj)):
+        t2_proj[tuple(i)]=0
+    if t1_proj.shape != t2_proj.shape:
+        if t1_proj.shape[0] < t2_proj.shape[0]:
+            t1_proj = match_shapes(t2_proj, t1_proj)
         else:
-            t8viz = match_shapes(t4viz, t8viz)
-    plt.figure(figsize=(13,2.5))
-    plt.subplot(141)
-    plt.imshow(-1*(t4viz>0),vmin=-1,vmax=1, cmap='seismic')
-    plt.imshow(1*(t8viz>0),alpha=0.5,vmin=-1,vmax=1, cmap='seismic')
-    plt.subplot(142)
-    be = eroded_and_mask(t4viz, t8viz)
-    plt.imshow(be, vmin=-1,vmax=1, cmap='seismic')
-    plt.subplot(143)
-    viz = t4viz-t8viz
-    rg_ = np.max([abs(np.max(viz)), abs(np.min(viz))])
-    plt.imshow(viz, cmap='RdBu', vmin=-rg_, vmax=rg_)
-    plt.colorbar()
-    plt.subplot(144)
-    diff_masked = (t4viz-t8viz)*be
-    rg_ = np.max([abs(np.max(diff_masked)), abs(np.min(diff_masked))])
-    plt.imshow(diff_masked, cmap='RdBu', vmin=-rg_, vmax=rg_)
-    plt.colorbar()
-    plt.suptitle(title)
-    plt.tight_layout()
-    plt.savefig('erosion_' + vizname+'.png')
-    plt.close()
-    subj_ind = vizname.split('_')[0]
-    np.savez(os.path.join('diff', '{}_diff'.format(subj_ind)), diff = diff_masked, mask=be)
+            t2_proj = match_shapes(t1_proj, t2_proj)
+    binary_erosion_mask = eroded_and_mask(t1_proj, t2_proj)
+    proj_diff = t1_proj - t2_proj
+    diff_masked = proj_diff * binary_erosion_mask
+    if save:
+        np.savez(save, diff = diff_masked, mask = binary_erosion_mask)
+    if plot:
+        plt.figure(figsize=(13,2.5))
+        plt.subplot(141)
+        plt.imshow(-1*(t1_proj>0),vmin = -1,vmax = 1, cmap = 'seismic')
+        plt.imshow(1*(t2_proj>0),alpha = 0.5, vmin = -1, vmax=1, cmap = 'seismic')
+        plt.subplot(142)
+        plt.imshow(binary_erosion_mask, vmin = -1,vmax = 1, cmap = 'seismic')
+        plt.subplot(143)
+        rg_ = np.max([abs(np.max(proj_diff)), abs(np.min(proj_diff))])
+        plt.imshow(proj_diff, cmap = 'RdBu', vmin = -rg_, vmax = rg_)
+        plt.colorbar()
+        plt.subplot(144)
+        rg_ = np.max([abs(np.max(diff_masked)), abs(np.min(diff_masked))])
+        plt.imshow(diff_masked, cmap = 'RdBu', vmin = -rg_, vmax = rg_)
+        plt.colorbar()
+        plt.tight_layout()
+        if not save is None:
+            plt.savefig(save.split('.')[-1] + '.png')
+            plt.close()
+        else:
+            plt.show()
+    return diff_masked
 
-print('Non matching sizes:' + str(cnt))
+if __name__ == '__main__':
+    path_to_T4 = 'data/t4'
+    path_to_T8 = 'data/t8'
+    for fname in os.listdir(path_to_T4):
+        try:
+            t4data = np.load(os.path.join(path_to_T4, fname))
+            t8data = np.load(os.path.join(path_to_T8, fname))
+        except FileNotFoundError as e:
+            print('Not such file: ' + fname)
+            continue
+        vizname = fname.split('.')[0]
+        subj_ind = vizname.split('_')[0]
+        make_difference(t4data['visualization'], t8data['visualization'], \
+            os.path.join('diff', '{}_diff'.format(subj_ind)), plot=True)

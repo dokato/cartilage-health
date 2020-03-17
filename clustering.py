@@ -50,16 +50,18 @@ print(sigma)
 sigma2 = np.mean(list_diff_stds)
 print(sigma2)
 
-
+area_covered = []
+sizes = []
 for ff in glob.glob(difference_maps_folder + '*.npz'):
     name = os.path.split(ff)[-1].split('.')[0]
     loader = np.load(ff)
     diffmap = loader['diff']
     mask    = loader['mask']
+    sizes.append(diffmap.shape)
     sigma_in = diffmap[np.where(mask>0)].std()
     mean_in = diffmap[np.where(mask>0)].mean()
     # Here's threshold based on sigma
-    diff_thresh = threshold_matrix_twosided(diffmap, mean_in + 1*sigma_in, mean_in - 1*sigma_in)
+    diff_thresh = threshold_matrix_twosided(diffmap, mean_in + 1*sigma_in, -1000)
     rg_ = np.max([abs(np.max(diff_thresh)), abs(np.min(diff_thresh))])
     plt.imshow(diff_thresh, cmap='RdBu',vmin=-rg_, vmax=rg_)
     plt.imshow(mask, cmap='binary', alpha=0.2)
@@ -79,7 +81,7 @@ for ff in glob.glob(difference_maps_folder + '*.npz'):
     plt.imshow(arrlabeled)
     plt.title('Pixel clusters')
     plt.subplot(313)
-    # Here's threshold based on size    
+    # Here's threshold based on size
     cutoff_size = ss.scoreatpercentile(areas, 80)
     coords_list = [reg.coords for reg, ar in zip(regions, areas) if ar > cutoff_size]
     mask_sized = make_mask_from_coords_list(np.zeros(diff_thresh.shape), coords_list) 
@@ -90,6 +92,6 @@ for ff in glob.glob(difference_maps_folder + '*.npz'):
     plt.imshow(mask, cmap='binary', alpha=0.2)
     plt.title(r"Difference values after whole clustering (80% area cut-off)")
     plt.tight_layout()
-    plt.savefig(os.path.join(difference_maps_folder, 'histsize', '{}_areas'.format(name)))
+    plt.savefig(os.path.join(difference_maps_folder, 'hist_pos', '{}_areas'.format(name)))
     plt.close()
-
+    area_covered.append(len(np.where(mask_sized>0)[0]) / len(np.where(mask>0)[0]))
