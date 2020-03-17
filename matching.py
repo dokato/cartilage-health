@@ -110,6 +110,7 @@ def make_difference(t1_data, t2_data, save = None, plot = False):
 if __name__ == '__main__':
     path_to_T4 = 'data/t4'
     path_to_T8 = 'data/t8'
+    output_folder = 'diff'
     for fname in os.listdir(path_to_T4):
         try:
             t4data = np.load(os.path.join(path_to_T4, fname))
@@ -120,4 +121,4 @@ if __name__ == '__main__':
         vizname = fname.split('.')[0]
         subj_ind = vizname.split('_')[0]
         make_difference(t4data['visualization'], t8data['visualization'], \
-            os.path.join('diff', '{}_diff'.format(subj_ind)), plot=True)
+            os.path.join(output_folder, '{}_diff'.format(subj_ind)), plot = True)
