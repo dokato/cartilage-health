@@ -105,7 +105,7 @@ def make_difference(t1_data, t2_data, save = None, plot = False):
             plt.close()
         else:
             plt.show()
-    return diff_masked
+    return diff_masked, binary_erosion_mask
 
 if __name__ == '__main__':
     path_to_T4 = 'data/t4'
