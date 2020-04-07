@@ -1,4 +1,5 @@
 import os, glob
+import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.stats as ss
@@ -28,6 +29,15 @@ def make_mask_from_coords_list(mat, coords_list, val = 1):
             mat[x,y] = val
     return mat
 
+def strip_empty_lines(mat):
+    newmat = mat[~np.all(mat == 0, axis=1)].T
+    newmat = newmat[~np.all(newmat == 0, axis=1)].T
+    return newmat
+
+def resize(mat, target_size = (44,22)):
+    resized = cv2.resize(mat, dsize = target_size, interpolation = cv2.INTER_NEAREST )
+    return resized
+
 def get_values_std(list_of_diffs, mode = 0):
     '''
     Iterates over difference values and returns standard deviation.
@@ -56,7 +66,8 @@ def get_values_std(list_of_diffs, mode = 0):
         sigma2 = np.mean(list_diff_stds)
     return sigma
 
-def threshold_diffmaps(diffmap, mask, sigma_threshold = None, area_threshold = 80, plot = False):
+def threshold_diffmaps(diffmap, mask, sigma_threshold = None, one_sided = 0,
+                       area_threshold = 80, plot = False):
     '''
     Performs clustering in two steps:
       1) Based on values - must be below, above sigma.
@@ -68,6 +79,8 @@ def threshold_diffmaps(diffmap, mask, sigma_threshold = None, area_threshold = 8
         sigma_threshold - value of sigma; if None (default) sigma is calculated based
                from diffmap and +/- 1.5 * sigma threshold is taken
                (values above sigma_threshold survive)
+        one_sided - thresholding from positive (+1) or negative (-1) sides only,
+               (default both: 0)
         area_threshold - percentile of cluste areas to survive, eg. 80 (default)
                is 80-th percentile
         plot - if string is given it saves plot with steps of thresholding to this path
@@ -77,10 +90,24 @@ def threshold_diffmaps(diffmap, mask, sigma_threshold = None, area_threshold = 8
     '''
     sigma_in = diffmap[np.where(mask>0)].std()
     mean_in = diffmap[np.where(mask>0)].mean()
+    st_diffmap = strip_empty_lines(diffmap + mask)
+    st_mask = strip_empty_lines(mask)
+    st_diffmap = resize(st_diffmap)
+    mask = resize(st_mask)
+    diffmap = st_diffmap - mask
+
     # Step (1) - Thresholding based on sigma
     val_threshold = sigma_threshold if sigma_threshold else 1.5 * sigma_in
-    diff_thresh = threshold_matrix_twosided(diffmap, \
-                                            mean_in + val_threshold, mean_in - val_threshold)
+    if one_sided != 0:
+        if one_sided > 0:
+            diff_thresh = threshold_matrix_twosided(diffmap, \
+                                                    mean_in + val_threshold, -np.inf)
+        else:
+            diff_thresh = threshold_matrix_twosided(diffmap, \
+                                                    np.inf, mean_in - val_threshold)
+    else:
+        diff_thresh = threshold_matrix_twosided(diffmap, \
+                                                mean_in + val_threshold, mean_in - val_threshold)
     # Determining area sizes
     arrlabeled = measure.label(diff_thresh != 0)
     regions = measure.regionprops(arrlabeled)
@@ -120,4 +147,4 @@ if __name__ == "__main__":
         diffmap = loader['diff']
         mask    = loader['mask']
         plot_path = os.path.join(difference_maps_folder, 'hist_xxx', '{}_areas'.format(name))
-        threshold_diffmaps(diffmap, mask, area_threshold = 80, plot = plot_path)
+        threshold_diffmaps(diffmap, mask, one_sided = -1, area_threshold = 80, plot = plot_path)
