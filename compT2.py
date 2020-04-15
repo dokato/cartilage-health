@@ -81,17 +81,25 @@ def linear_fit_t2(timevec, echos):
     t2 = 1./beta[1]
     return t2, res
 
-def nonlinear_fit_t2(timevec, echos):
+def nonlinear_fit_t2(timevec, echos, p0 = None):
     'Returns T2 value from linear fit ([ECHOS]=A*exp([TIMEVEC]/T2)'
     def exp_func(t, A, m):
         return A * np.exp(-m * t)
+    if p0 is None:
+        p0 = (echos[0], .03)
     params, _ = curve_fit(exp_func, 
                           timevec, 
                           echos, 
-                          p0 = [echos[0], .03])
+                          p0 = p0)
     t2 = 1./params[1]
     res = np.sum((echos - exp_func(timevec, params[0], params[1]))**2)
     return t2, res
+
+def strictly_decreasing(vec):
+    return np.all(np.diff(vec)<0)
+
+def running_mean(x, n = 3):
+    return np.convolve(x, np.ones((n,))/n)[(n-1):]
 
 def fit_t2(t2imgs, t2times, segmentation = None, n_jobs = 4):
     '''
@@ -125,16 +133,16 @@ def fit_t2(t2imgs, t2times, segmentation = None, n_jobs = 4):
             iy = mask_indices_c[i]
             if all(data[:,ix,iy] == data[0,ix,iy]): # if constant value, decay is 0 
                 continue
-            t2_, res_ = linear_fit_t2(x[1:], data[1:,ix,iy])
-            #t2_, res_ = nonlinear_fit_t2(mri_time[1:], scan[1:,ix,iy])
+            if strictly_decreasing(scan[1:,ix,iy]):
+                echo_corrected = scan[1:,ix,iy] 
+            else:
+                echo_corrected = running_mean(scan[1:,ix,iy])
+            #t2_, res_ = linear_fit_t2(x[1:], data[1:,ix,iy])
+            t2_, res_ = nonlinear_fit_t2(mri_time[1:], echo_corrected)
             t2_matrix[ix, iy] = t2_
             res_matrix[ix, iy] = res_
-        res_matrix[np.where(res_matrix > np.percentile(res_matrix.flatten(), 98.))] = 0
-        res_matrix[np.where(res_matrix < 0)] = 0
-        t2_matrix[np.where(t2_matrix > np.percentile(t2_matrix.flatten(), 97.))] = 0
         t2_matrix[np.where(t2_matrix < 0)] = 0
-        t2_matrix[np.where(res_matrix > 0.1)] = 0
-
+        t2_matrix[np.where(t2_matrix > .1)] = 0
         return t2_matrix
 
     t2_list = Parallel(n_jobs = n_jobs, verbose=1)(map(delayed(fit_per_slice), range(t2imgs.shape[0])))
@@ -154,6 +162,7 @@ if __name__ == "__main__":
     t2matrix = fit_t2(t2imgs, t2times, segmentation = segmentation)
     print(time.time() - t0)
     plt.imshow(t2matrix.mean(axis=0))
+    plt.colorbar()
     plt.show()
     with open('{}_t2.npy'.format(file_name), 'wb') as ff:
         np.save(ff, t2matrix)
