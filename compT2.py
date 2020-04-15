@@ -4,6 +4,7 @@ import pydicom
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.linalg as la
+from scipy.optimize import curve_fit
 from scipy.io import loadmat
 import time
 
@@ -74,6 +75,24 @@ def get_segmentation_mask(path, nr_slices = 29, structure = 'femoral_cartilage')
     segmentation = np.array(segmentation)
     return segmentation
 
+def linear_fit_t2(timevec, echos):
+    'Returns T2 value from linear fit ([ECHOS]=A+(1/T2)*[TIMEVEC])'
+    beta, res, _, _ = la.lstsq(timevec, echos)
+    t2 = 1./beta[1]
+    return t2, res
+
+def nonlinear_fit_t2(timevec, echos):
+    'Returns T2 value from linear fit ([ECHOS]=A*exp([TIMEVEC]/T2)'
+    def exp_func(t, A, m):
+        return A * np.exp(-m * t)
+    params, _ = curve_fit(exp_func, 
+                          timevec, 
+                          echos, 
+                          p0 = [echos[0], .03])
+    t2 = 1./params[1]
+    res = np.sum((echos - exp_func(timevec, params[0], params[1]))**2)
+    return t2, res
+
 def fit_t2(t2imgs, t2times, segmentation = None, n_jobs = 4):
     '''
     Fits T2 curves to the T2_weighted images in each slice.
@@ -92,25 +111,30 @@ def fit_t2(t2imgs, t2times, segmentation = None, n_jobs = 4):
         mri_time = np.array(t2times[slice_idx]) - t2times[slice_idx][0]
         if not segmentation is None:
             segmentation_mask = segmentation[slice_idx,:,:]
+            (mask_indices_r, mask_indices_c) = np.where(segmentation_mask)
+
         data = np.log(scan + 0.0000000001) # to avoid log(0)
         x = np.concatenate((np.ones_like(mri_time[..., np.newaxis]), -mri_time[..., np.newaxis]), 1)
+
         t2_matrix = np.zeros((data.shape[1], data.shape[2]))
         res_matrix = np.zeros((data.shape[1], data.shape[2]))
-        for ix in range(data.shape[2]):
-            for iy in range(data.shape[2]):
-                if all(data[:,ix,iy] == data[0,ix,iy]): # if constant value, decay is 0 
-                    continue
-                beta, res, _, _ = la.lstsq(x[1:], data[1:,ix,iy])
-                t2_ = 1./beta[1]
-                t2_matrix[ix, iy] = t2_
-                res_matrix[ix, iy] = res
-        res_matrix[np.where(res_matrix > np.percentile(res_matrix.flatten(), 98.))]=0
+        if len(mask_indices_r) == 0:
+            return t2_matrix
+        for i in range(len(mask_indices_r)):
+            ix = mask_indices_r[i]
+            iy = mask_indices_c[i]
+            if all(data[:,ix,iy] == data[0,ix,iy]): # if constant value, decay is 0 
+                continue
+            t2_, res_ = linear_fit_t2(x[1:], data[1:,ix,iy])
+            #t2_, res_ = nonlinear_fit_t2(mri_time[1:], scan[1:,ix,iy])
+            t2_matrix[ix, iy] = t2_
+            res_matrix[ix, iy] = res_
+        res_matrix[np.where(res_matrix > np.percentile(res_matrix.flatten(), 98.))] = 0
         res_matrix[np.where(res_matrix < 0)] = 0
         t2_matrix[np.where(t2_matrix > np.percentile(t2_matrix.flatten(), 97.))] = 0
         t2_matrix[np.where(t2_matrix < 0)] = 0
         t2_matrix[np.where(res_matrix > 0.1)] = 0
-        if not segmentation is None:
-            t2_matrix[np.where(segmentation_mask != 1)] = 0
+
         return t2_matrix
 
     t2_list = Parallel(n_jobs = n_jobs, verbose=1)(map(delayed(fit_per_slice), range(t2imgs.shape[0])))
@@ -124,10 +148,12 @@ if __name__ == "__main__":
     file_name = sys.argv[1]
     dirname = "data/{}/T2/".format(file_name)
     nr_slices = estimate_nr_slices(dirname)
-    segmentation = None #get_segmentation_mask("data/{}/T2BinarySegmentation/{}_4_".format(file_name, file_name) + "{}.mat", nr_slices)
+    segmentation = get_segmentation_mask("data/{}/T2BinarySegmentation/{}_4_".format(file_name, file_name) + "{}.mat", nr_slices)
     t2imgs, t2times = get_t2(dirname, nr_slices = nr_slices)
     t0 = time.time()
     t2matrix = fit_t2(t2imgs, t2times, segmentation = segmentation)
     print(time.time() - t0)
+    plt.imshow(t2matrix.mean(axis=0))
+    plt.show()
     with open('{}_t2.npy'.format(file_name), 'wb') as ff:
         np.save(ff, t2matrix)
