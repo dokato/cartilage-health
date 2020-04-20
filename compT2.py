@@ -101,13 +101,15 @@ def strictly_decreasing(vec):
 def running_mean(x, n = 3):
     return np.convolve(x, np.ones((n,))/n)[(n-1):]
 
-def fit_t2(t2imgs, t2times, segmentation = None, n_jobs = 4):
+def fit_t2(t2imgs, t2times, segmentation = None, fit_type = 'exp', n_jobs = 4):
     '''
     Fits T2 curves to the T2_weighted images in each slice.
     IN:
         t2imgs - with T2 weighted images in numpy array (nr_slices, time_steps, width, heigth)
         t2times - list with aquisition times
         segmentation - segmentation matrix (nr_slices, width, heigth)
+        fit_type - str with fitting type: 'lin' for linear fir to log of scans
+                  'exp' - exponential  function fit (default)
         n_jobs - number of parallel jobs
     OUT:
         matrix (nr_slices, width, heigth) with T2 values
@@ -117,28 +119,34 @@ def fit_t2(t2imgs, t2times, segmentation = None, n_jobs = 4):
     def fit_per_slice(slice_idx):
         scan = t2imgs[slice_idx,:,:,:]
         mri_time = np.array(t2times[slice_idx]) - t2times[slice_idx][0]
-        if not segmentation is None:
+        if segmentation is None:
+            (mask_indices_r, mask_indices_c) = (scan != 0).any(axis = 0)
+        else:
             segmentation_mask = segmentation[slice_idx,:,:]
             (mask_indices_r, mask_indices_c) = np.where(segmentation_mask)
 
-        data = np.log(scan + 0.0000000001) # to avoid log(0)
+        logscan = np.log(scan + 0.0000000001) # to avoid log(0)
         x = np.concatenate((np.ones_like(mri_time[..., np.newaxis]), -mri_time[..., np.newaxis]), 1)
 
-        t2_matrix = np.zeros((data.shape[1], data.shape[2]))
-        res_matrix = np.zeros((data.shape[1], data.shape[2]))
+        t2_matrix = np.zeros((logscan.shape[1], logscan.shape[2]))
+        res_matrix = np.zeros((logscan.shape[1], logscan.shape[2]))
         if len(mask_indices_r) == 0:
             return t2_matrix
         for i in range(len(mask_indices_r)):
             ix = mask_indices_r[i]
             iy = mask_indices_c[i]
-            if all(data[:,ix,iy] == data[0,ix,iy]): # if constant value, decay is 0 
+            if all(logscan[:,ix,iy] == logscan[0,ix,iy]): # if constant value, decay is 0 
                 continue
             if strictly_decreasing(scan[1:,ix,iy]):
                 echo_corrected = scan[1:,ix,iy] 
             else:
                 echo_corrected = running_mean(scan[1:,ix,iy])
-            #t2_, res_ = linear_fit_t2(x[1:], data[1:,ix,iy])
-            t2_, res_ = nonlinear_fit_t2(mri_time[1:], echo_corrected)
+            if fit_type == 'lin':
+                t2_, res_ = linear_fit_t2(x[1:], logscan[1:,ix,iy])
+            elif fit_type == 'exp':
+                t2_, res_ = nonlinear_fit_t2(mri_time[1:], echo_corrected)
+            else:
+                raise ValueError("wrong 'fit_type' value")
             t2_matrix[ix, iy] = t2_
             res_matrix[ix, iy] = res_
         t2_matrix[np.where(t2_matrix < 0)] = 0
