@@ -87,12 +87,15 @@ def nonlinear_fit_t2(timevec, echos, p0 = None):
         return A * np.exp(-m * t)
     if p0 is None:
         p0 = (echos[0], .03)
-    params, _ = curve_fit(exp_func, 
-                          timevec, 
-                          echos, 
-                          p0 = p0)
-    t2 = 1./params[1]
-    res = np.sum((echos - exp_func(timevec, params[0], params[1]))**2)
+    try:
+        params, _ = curve_fit(exp_func, 
+                            timevec, 
+                            echos, 
+                            p0 = p0)
+        t2 = 1./params[1]
+        res = np.sum((echos - exp_func(timevec, params[0], params[1]))**2)
+    except RuntimeError:
+        t2, res = 0, np.inf
     return t2, res
 
 def strictly_decreasing(vec):
