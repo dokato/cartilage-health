@@ -78,4 +78,4 @@ For negative and positive thresholding set argument `one_sided` to -1 or 1 respe
 threshold_diffmaps(diff_masked, mask, one_sided = 1, area_threshold = 80)
 ```
 
-Check docs for more settings.
+Check docstrings of each function for more customization.
